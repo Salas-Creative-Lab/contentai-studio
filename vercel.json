@@ -1,9 +1,5 @@
 {
   "buildCommand": "prisma generate && next build",
   "installCommand": "bun install",
-  "framework": "nextjs",
-  "regions": ["sfo1", "iad1"],
-  "env": {
-    "DATABASE_URL": "file:./db/custom.db"
-  }
+  "framework": "nextjs"
 }
