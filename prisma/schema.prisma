@@ -1,1 +1,344 @@
+// ContentAI Studio - Schema Completo
+// Plataforma Multi-Cliente de Generación de Contenido con IA
 
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ================================
+// CAPA 1: GESTIÓN DEL CLIENTE
+// ================================
+
+model Client {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logo        String?  // URL del logo
+  isotipo     String?  // URL del isotipo
+  
+  // Colores institucionales
+  primaryColor   String  @default("#3B82F6")
+  secondaryColor String  @default("#1E40AF")
+  accentColor    String  @default("#F59E0B")
+  
+  // Tipografías
+  headingFont  String @default("Inter")
+  bodyFont     String @default("Inter")
+  
+  // Información del negocio
+  rubro        String?
+  description  String?
+  website      String?
+  
+  // Preferencias de IA
+  aiTone       String  @default("professional") // professional, casual, energetic, elegant
+  aiLanguage   String  @default("es")
+  
+  // Modo de operación
+  operationMode String @default("manual") // manual, automatic
+  
+  // Configuración
+  isActive     Boolean @default(true)
+  settings     String? // JSON para configuraciones adicionales
+  
+  // Relaciones
+  presets      Preset[]
+  products     Product[]
+  contents     GeneratedContent[]
+  exports      ExportHistory[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ================================
+// CAPA 2: PRESETS
+// ================================
+
+model Preset {
+  id          String   @id @default(cuid())
+  clientId    String
+  name        String
+  slug        String
+  description String?
+  
+  // Estilo visual
+  styleType   String  @default("template") // template, ai_generative
+  templateId  String? // ID de plantilla base si es template
+  
+  // Colores del preset
+  primaryColor   String  @default("#3B82F6")
+  secondaryColor String  @default("#1E40AF")
+  accentColor    String  @default("#F59E0B")
+  backgroundColor String  @default("#FFFFFF")
+  
+  // Tipografías
+  headingFont  String @default("Inter")
+  bodyFont     String @default("Inter")
+  
+  // Distribución de textos
+  textLayout   String  @default("center") // left, center, right, justified
+  titlePosition String @default("top") // top, center, bottom
+  textAlignment String @default("center")
+  
+  // Estilo de fondo
+  backgroundStyle String  @default("solid") // solid, gradient, pattern, image
+  gradientDirection String @default("to-r") // to-r, to-l, to-b, to-t, diagonal
+  backgroundPattern String?
+  
+  // Estilo de composición
+  compositionStyle String @default("standard") // standard, minimal, bold, elegant
+  imageSize        String  @default("large") // small, medium, large, fill
+  imagePosition    String  @default("center")
+  padding          Int     @default(20)
+  
+  // Estilo de reel
+  reelStyle      String  @default("fade") // fade, slide, zoom, rotate
+  reelDuration   Int     @default(3)
+  reelTransition String  @default("smooth")
+  
+  // Tono de textos generados por IA
+  textTone       String  @default("professional")
+  textLength     String  @default("medium") // short, medium, long
+  
+  // Reglas de exportación
+  exportFormat   String  @default("jpg") // jpg, png, webp
+  exportSizes    String  @default("1080x1080,1080x1920,1200x628") // JSON array
+  exportPath     String?
+  
+  // Configuración de redes sociales
+  socialNetworks String? // JSON: { instagram: true, facebook: true, ... }
+  
+  // Metadatos
+  isDefault      Boolean @default(false)
+  isActive       Boolean @default(true)
+  usageCount     Int     @default(0)
+  
+  // Relaciones
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contents      GeneratedContent[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([clientId, slug])
+}
+
+// ================================
+// CAPA 5: DETECCIÓN DE PRODUCTOS
+// ================================
+
+model ProductType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  category    String   // calzado, indumentaria, accesorios, equipamiento
+  description String?
+  
+  // Reglas automáticas
+  defaultPresetId String?
+  recommendedBackground String?
+  preferredAngle  String?
+  
+  // Configuración de detección
+  keywords    String? // JSON array de palabras clave para detección
+  
+  isActive    Boolean  @default(true)
+  products    Product[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  clientId    String
+  
+  // Información básica
+  title       String
+  description String?
+  price       Float?
+  currency    String   @default("ARS")
+  sku         String?
+  
+  // Detección automática
+  detectedType    String?  // Tipo detectado por IA
+  typeId          String?  // FK a ProductType
+  detectionScore  Float?   // Confianza de la detección
+  isCorrectlyDetected Boolean @default(true)
+  manualCorrection String? // Si el usuario corrigió
+  
+  // Atributos y variantes
+  attributes  String? // JSON: { color: "rojo", talle: "42", ... }
+  variants    String? // JSON array de variantes
+  
+  // Imágenes
+  originalImage    String?  // Imagen original
+  processedImage   String?  // Imagen procesada
+  noBackgroundImage String? // Sin fondo
+  enhancedImage    String?  // Embellecida
+  
+  // Estado
+  status      String   @default("draft") // draft, processed, published
+  isActive    Boolean  @default(true)
+  
+  // Relaciones
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type        ProductType? @relation(fields: [typeId], references: [id])
+  contents    GeneratedContent[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ================================
+// CAPA 7-8: CONTENIDO GENERADO
+// ================================
+
+model GeneratedContent {
+  id          String   @id @default(cuid())
+  clientId    String
+  productId   String?
+  presetId    String?
+  
+  // Textos generados por IA
+  title       String?
+  subtitle    String?
+  benefits    String? // JSON array
+  claims      String? // JSON array
+  callToAction String?
+  shortText   String? // Para reels
+  longText    String? // Para redes
+  
+  // Imágenes generadas
+  composedImage   String? // Imagen final compuesta
+  ecommerceImage  String? // Versión para e-commerce
+  socialImage     String? // Versión para redes sociales
+  
+  // Video/Reel
+  reelUrl     String?
+  reelDuration Int?
+  reelFormat  String?
+  
+  // Metadatos de generación
+  generationPrompt String?
+  aiModel     String?
+  generationTime Float? // segundos
+  
+  // Estado
+  status      String   @default("pending") // pending, processing, completed, failed
+  isApproved  Boolean  @default(false)
+  
+  // Relaciones
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  preset      Preset?  @relation(fields: [presetId], references: [id], onDelete: SetNull)
+  exports     ExportHistory[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ================================
+// CAPA 10: EXPORTACIÓN
+// ================================
+
+model ExportHistory {
+  id          String   @id @default(cuid())
+  clientId    String
+  contentId   String?
+  
+  // Detalles de exportación
+  exportType  String   // image, reel, batch
+  format      String   // jpg, png, mp4
+  size        String?
+  fileName    String
+  
+  // Destino
+  destination String   // drive, download
+  driveFolderId String?
+  driveFileId String?
+  downloadUrl String?
+  
+  // Estado
+  status      String   @default("pending") // pending, completed, failed
+  errorMessage String?
+  
+  // Metadatos
+  fileSize    Int?     // bytes
+  
+  // Relaciones
+  client      Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  content     GeneratedContent? @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+}
+
+// ================================
+// PLANTILLAS
+// ================================
+
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  category    String   // social, ecommerce, story, reel
+  description String?
+  
+  // Configuración visual
+  thumbnail   String?  // Preview de la plantilla
+  config      String   // JSON con toda la configuración
+  
+  // Dimensiones
+  width       Int      @default(1080)
+  height      Int      @default(1080)
+  
+  // Metadatos
+  isPremium   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  usageCount  Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ================================
+// CONFIGURACIÓN DEL SISTEMA
+// ================================
+
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ================================
+// USUARIOS (para autenticación básica)
+// ================================
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  password    String?
+  role        String   @default("user") // admin, user, viewer
+  
+  // Permisos de cliente
+  clientIds   String?  // JSON array de IDs de clientes permitidos
+  
+  isActive    Boolean  @default(true)
+  lastLogin   DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
